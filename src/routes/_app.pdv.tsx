@@ -193,44 +193,50 @@ function PDV() {
             {itens.map(({ produto, qtd }) => (
               <li
                 key={produto.id}
-                className="flex items-center gap-2 rounded-xl border border-border/60 bg-card p-2.5"
+                className="rounded-xl border border-border/60 bg-card p-2.5"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{produto.nome}</p>
-                  <p className="text-xs text-muted-foreground">{moeda(produto.preco)} un.</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => mudarQtd(produto.id, -1)}
-                    aria-label="Diminuir quantidade"
-                    className="rounded-lg bg-muted p-1.5 text-foreground active:scale-90"
-                  >
-                    <Minus className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="w-6 text-center text-sm font-semibold tabular-nums text-foreground">
-                    {qtd}
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium leading-tight text-foreground">
+                    {produto.nome}
+                  </p>
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">
+                    {moeda(produto.preco * qtd)}
                   </span>
-                  <button
-                    onClick={() => adicionar(produto.id)}
-                    aria-label="Aumentar quantidade"
-                    className="rounded-lg bg-muted p-1.5 text-foreground active:scale-90"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
                 </div>
-                <span className="w-16 shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
-                  {moeda(produto.preco * qtd)}
-                </span>
-                <button
-                  onClick={() => setCarrinho((c) => {
-                    const { [produto.id]: _removido, ...resto } = c;
-                    return resto;
-                  })}
-                  aria-label="Remover item"
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">{moeda(produto.preco)} un.</p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => mudarQtd(produto.id, -1)}
+                      aria-label="Diminuir quantidade"
+                      className="rounded-lg bg-muted p-1.5 text-foreground active:scale-90"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="w-6 text-center text-sm font-semibold tabular-nums text-foreground">
+                      {qtd}
+                    </span>
+                    <button
+                      onClick={() => adicionar(produto.id)}
+                      aria-label="Aumentar quantidade"
+                      className="rounded-lg bg-muted p-1.5 text-foreground active:scale-90"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCarrinho((c) => {
+                          const { [produto.id]: _removido, ...resto } = c;
+                          return resto;
+                        })
+                      }
+                      aria-label="Remover item"
+                      className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
