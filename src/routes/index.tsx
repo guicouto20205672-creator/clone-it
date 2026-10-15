@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Mail,
@@ -55,6 +55,7 @@ function Logo({ size = "md" }: { size?: "md" | "lg" }) {
 }
 
 function Index() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"entrar" | "criar">("entrar");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -117,7 +118,10 @@ function Index() {
 
             <form
               className="mt-7 space-y-5"
-              onSubmit={(e) => e.preventDefault()}
+              onSubmit={(e) => {
+                e.preventDefault();
+                navigate({ to: "/dashboard" });
+              }}
             >
               {tab === "criar" && (
                 <div>
