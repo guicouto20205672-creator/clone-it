@@ -48,7 +48,7 @@ export function Campo({ label, children }: { label: string; children: ReactNode 
 export const inputCls =
   "w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/25";
 
-export function Kpi({ label, value, hint, tone = "default" }: { label: string; value: string; hint?: string; tone?: "default" | "good" | "bad" }) {
+export function Kpi({ label, value, hint, tone = "default" }: { label: string; value: string; hint?: string | undefined; tone?: "default" | "good" | "bad" }) {
   const c = tone === "good" ? "text-brand-dark" : tone === "bad" ? "text-destructive" : "text-foreground";
   return (
     <div className="rounded-2xl border border-border bg-card p-4">

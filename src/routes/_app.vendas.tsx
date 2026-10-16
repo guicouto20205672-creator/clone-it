@@ -33,7 +33,7 @@ function Vendas() {
   async function cancelar(id: string) {
     if (!confirm("Cancelar esta venda? O estoque não volta automaticamente.")) return;
     const { error } = await supabase.from("vendas").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Venda cancelada");
     refresh("vendas");
   }
