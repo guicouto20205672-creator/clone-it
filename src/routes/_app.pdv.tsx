@@ -1,432 +1,168 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import {
-  Search,
-  ScanBarcode,
-  Plus,
-  Minus,
-  Trash2,
-  Banknote,
-  QrCode,
-  CreditCard,
-  HandCoins,
-  ShoppingCart,
-  X,
-  CheckCircle2,
-  ChevronDown,
-  CalendarDays,
-  Tag,
-} from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, Package, X, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { brl, num, PAGAMENTOS, useClientes, useProdutos, useRefresh, type Produto } from "@/lib/loja";
+import { BtnPrimary, inputCls, Vazio } from "@/components/ui-loja";
 
 export const Route = createFileRoute("/_app/pdv")({
-  head: () => ({
-    meta: [
-      { title: "PDV — Controle Store" },
-      {
-        name: "description",
-        content:
-          "Frente de caixa rápida: busque o produto, monte o carrinho e finalize a venda no Pix, dinheiro, cartão ou fiado.",
-      },
-      { property: "og:title", content: "PDV — Controle Store" },
-      {
-        property: "og:description",
-        content:
-          "Frente de caixa rápida: venda no Pix, dinheiro, cartão ou fiado em poucos toques.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: () => ({ meta: [{ title: "PDV — Rezende Distribuidora" }] }),
   component: PDV,
 });
 
-const moeda = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
-
-type Produto = {
-  id: string;
-  nome: string;
-  preco: number;
-  estoque: number;
-  cat: string;
-};
-
-const PRODUTOS: Produto[] = [
-  { id: "1", nome: "Camiseta Básica Preta", preco: 49.9, estoque: 24, cat: "Camisetas" },
-  { id: "2", nome: "Camiseta Gola V Branca", preco: 54.9, estoque: 18, cat: "Camisetas" },
-  { id: "3", nome: "Camiseta Estampada Azul", preco: 69.9, estoque: 9, cat: "Camisetas" },
-  { id: "4", nome: "Tênis Casual Cano Baixo", preco: 189.9, estoque: 7, cat: "Calçados" },
-  { id: "5", nome: "Tênis Running Pro", preco: 259.0, estoque: 4, cat: "Calçados" },
-  { id: "6", nome: "Sandália de Couro", preco: 119.9, estoque: 12, cat: "Calçados" },
-  { id: "7", nome: "Boné Aba Curva", preco: 39.9, estoque: 31, cat: "Acessórios" },
-  { id: "8", nome: "Cinto Couro Caramelo", preco: 79.9, estoque: 15, cat: "Acessórios" },
-  { id: "9", nome: "Meia Kit 3 Pares", preco: 34.9, estoque: 40, cat: "Acessórios" },
-  { id: "10", nome: "Bermuda Jeans", preco: 99.9, estoque: 11, cat: "Moda" },
-  { id: "11", nome: "Calça Jogger", preco: 129.9, estoque: 8, cat: "Moda" },
-  { id: "12", nome: "Jaqueta Corta-Vento", preco: 169.9, estoque: 5, cat: "Moda" },
-];
-
-const CATS = ["Todos", "Camisetas", "Calçados", "Acessórios", "Moda"];
-
-const FORMAS = [
-  { id: "dinheiro", label: "Dinheiro", icone: Banknote, cor: "from-emerald-500 to-green-600" },
-  { id: "pix", label: "PIX", icone: QrCode, cor: "from-lime-500 to-emerald-600" },
-  { id: "cartao", label: "Cartão", icone: CreditCard, cor: "from-blue-500 to-indigo-600" },
-  { id: "fiado", label: "Fiado", icone: HandCoins, cor: "from-orange-500 to-red-500" },
-];
+type Item = { produto: Produto; qtd: number; preco: number };
 
 function PDV() {
+  const { data: produtos = [], isLoading } = useProdutos();
+  const { data: clientes = [] } = useClientes();
+  const refresh = useRefresh();
   const [busca, setBusca] = useState("");
   const [cat, setCat] = useState("Todos");
-  const [carrinho, setCarrinho] = useState<Record<string, number>>({ "1": 1, "9": 2 });
-  const [forma, setForma] = useState("pix");
-  const [desconto, setDesconto] = useState(0);
-  const [extras, setExtras] = useState(false);
-  const [carrinhoAberto, setCarrinhoAberto] = useState(false);
-  const [concluida, setConcluida] = useState(false);
+  const [atacado, setAtacado] = useState(false);
+  const [carrinho, setCarrinho] = useState<Item[]>([]);
+  const [desconto, setDesconto] = useState("");
+  const [pag, setPag] = useState<string>("dinheiro");
+  const [clienteId, setClienteId] = useState("");
+  const [folha, setFolha] = useState(false);
+  const [enviando, setEnviando] = useState(false);
 
-  const filtrados = useMemo(
-    () =>
-      PRODUTOS.filter(
-        (p) =>
-          (cat === "Todos" || p.cat === cat) &&
-          p.nome.toLowerCase().includes(busca.trim().toLowerCase()),
-      ),
-    [busca, cat],
+  const cats = ["Todos", ...Array.from(new Set(produtos.map((p) => p.categoria).filter(Boolean) as string[]))];
+  const lista = produtos.filter(
+    (p) => (cat === "Todos" || p.categoria === cat) && `${p.nome} ${p.codigo ?? ""}`.toLowerCase().includes(busca.toLowerCase()),
   );
+  const precoDe = (p: Produto) => Number(atacado && p.preco_atacado != null ? p.preco_atacado : p.preco_venda);
 
-  const itens = Object.entries(carrinho)
-    .map(([id, qtd]) => ({ produto: PRODUTOS.find((p) => p.id === id)!, qtd }))
-    .filter((l) => l.produto);
-
-  const subtotal = itens.reduce((s, l) => s + l.produto.preco * l.qtd, 0);
-  const total = Math.max(0, subtotal - desconto);
-  const qtdItens = itens.reduce((s, l) => s + l.qtd, 0);
-
-  const adicionar = (id: string) => {
-    setConcluida(false);
-    setCarrinho((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
-  };
-
-  const mudarQtd = (id: string, delta: number) =>
+  function add(p: Produto) {
     setCarrinho((c) => {
-      const nova = (c[id] || 0) + delta;
-      if (nova <= 0) {
-        const { [id]: _removido, ...resto } = c;
-        return resto;
-      }
-      return { ...c, [id]: nova };
+      const i = c.find((x) => x.produto.id === p.id);
+      return i ? c.map((x) => (x.produto.id === p.id ? { ...x, qtd: x.qtd + 1 } : x)) : [...c, { produto: p, qtd: 1, preco: precoDe(p) }];
     });
+  }
+  const mudar = (id: string, d: number) =>
+    setCarrinho((c) => c.map((x) => (x.produto.id === id ? { ...x, qtd: Math.max(1, x.qtd + d) } : x)));
+  const tirar = (id: string) => setCarrinho((c) => c.filter((x) => x.produto.id !== id));
 
-  const finalizar = () => {
-    if (itens.length === 0) return;
-    setConcluida(true);
-    setCarrinho({});
-    setDesconto(0);
-  };
+  const subtotal = carrinho.reduce((s, i) => s + i.qtd * i.preco, 0);
+  const desc = Math.min(num(desconto), subtotal);
+  const total = subtotal - desc;
+  const qtdItens = carrinho.reduce((s, i) => s + i.qtd, 0);
+
+  async function finalizar() {
+    if (!carrinho.length) return;
+    if (pag === "fiado" && !clienteId) return toast.error("Escolha o cliente para vender fiado");
+    setEnviando(true);
+    const custo = carrinho.reduce((s, i) => s + i.qtd * Number(i.produto.preco_custo), 0);
+    const { data: venda, error } = await supabase
+      .from("vendas")
+      .insert({
+        cliente_id: clienteId || null, subtotal, desconto: desc, total, custo_total: custo,
+        forma_pagamento: pag, status: pag === "fiado" ? "fiado" : "paga", pago_em: pag === "fiado" ? null : new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (error || !venda) {
+      setEnviando(false);
+      return toast.error("Erro ao salvar venda: " + error?.message);
+    }
+    const { error: e2 } = await supabase.from("venda_itens").insert(
+      carrinho.map((i) => ({ venda_id: venda.id, produto_id: i.produto.id, nome: i.produto.nome, quantidade: i.qtd, preco_unit: i.preco, custo_unit: Number(i.produto.preco_custo) })),
+    );
+    setEnviando(false);
+    if (e2) return toast.error("Erro nos itens: " + e2.message);
+    toast.success(`Venda de ${brl(total)} finalizada!`, { icon: <CheckCircle2 className="h-4 w-4" /> });
+    setCarrinho([]);
+    setDesconto("");
+    setClienteId("");
+    setPag("dinheiro");
+    setFolha(false);
+    refresh("vendas", "produtos");
+  }
 
   const painel = (
     <div className="flex h-full flex-col">
-      {/* Status do caixa */}
-      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-          Caixa aberto
-        </span>
-        <button
-          onClick={() => setExtras((v) => !v)}
-          className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${extras ? "rotate-180" : ""}`} />
-          Opções adicionais
-        </button>
+      <div className="flex items-center justify-between border-b border-border p-4">
+        <p className="flex items-center gap-2 font-semibold text-foreground"><ShoppingCart className="h-5 w-5" />Carrinho ({qtdItens})</p>
+        <button className="rounded-lg p-1.5 text-muted-foreground lg:hidden" onClick={() => setFolha(false)} aria-label="Fechar"><X className="h-5 w-5" /></button>
       </div>
-
-      {extras && (
-        <div className="space-y-2 border-b border-border/60 bg-muted/40 px-4 py-3">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <CalendarDays className="h-3.5 w-3.5" />
-            Data da Venda
-            <input
-              type="date"
-              defaultValue="2026-10-15"
-              className="ml-auto rounded-lg border border-input bg-card px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Tag className="h-3.5 w-3.5" />
-            Canal de venda (opcional)
-            <select className="ml-auto rounded-lg border border-input bg-card px-2 py-1 text-xs text-foreground outline-none focus:border-primary">
-              <option>Loja física</option>
-              <option>WhatsApp</option>
-              <option>Catálogo online</option>
-            </select>
-          </label>
-        </div>
-      )}
-
-      {/* Carrinho */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold tracking-tight text-foreground">
-          <ShoppingCart className="h-4 w-4 text-primary" />
-          Carrinho
-          {qtdItens > 0 && (
-            <span className="rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">
-              {qtdItens}
-            </span>
-          )}
-        </h2>
-
-        {concluida ? (
-          <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-center">
-            <CheckCircle2 className="mx-auto h-7 w-7 text-primary" />
-            <p className="mt-1.5 text-sm font-bold text-foreground">Venda finalizada!</p>
-            <p className="text-xs text-muted-foreground">Comprovante enviado para o cliente.</p>
+      <div className="flex-1 space-y-2 overflow-y-auto p-4">
+        {carrinho.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Toque nos produtos para adicionar</p>}
+        {carrinho.map((i) => (
+          <div key={i.produto.id} className="flex items-center gap-2 rounded-xl bg-muted/60 p-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">{i.produto.nome}</p>
+              <p className="text-xs text-muted-foreground">{brl(i.preco)} · {brl(i.preco * i.qtd)}</p>
+            </div>
+            <button aria-label="Diminuir" onClick={() => mudar(i.produto.id, -1)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-card"><Minus className="h-3.5 w-3.5" /></button>
+            <span className="w-6 text-center text-sm font-bold">{i.qtd}</span>
+            <button aria-label="Aumentar" onClick={() => mudar(i.produto.id, 1)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-card"><Plus className="h-3.5 w-3.5" /></button>
+            <button aria-label="Remover" onClick={() => tirar(i.produto.id)} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
           </div>
-        ) : itens.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-            Carrinho vazio
-            <br />
-            Adicione pelo menos um produto à venda
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {itens.map(({ produto, qtd }) => (
-              <li
-                key={produto.id}
-                className="rounded-xl border border-border/60 bg-card p-2.5"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium leading-tight text-foreground">
-                    {produto.nome}
-                  </p>
-                  <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">
-                    {moeda(produto.preco * qtd)}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">{moeda(produto.preco)} un.</p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => mudarQtd(produto.id, -1)}
-                      aria-label="Diminuir quantidade"
-                      className="rounded-lg bg-muted p-1.5 text-foreground active:scale-90"
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="w-6 text-center text-sm font-semibold tabular-nums text-foreground">
-                      {qtd}
-                    </span>
-                    <button
-                      onClick={() => adicionar(produto.id)}
-                      aria-label="Aumentar quantidade"
-                      className="rounded-lg bg-muted p-1.5 text-foreground active:scale-90"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() =>
-                        setCarrinho((c) => {
-                          const { [produto.id]: _removido, ...resto } = c;
-                          return resto;
-                        })
-                      }
-                      aria-label="Remover item"
-                      className="ml-1 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        ))}
       </div>
-
-      {/* Totais + pagamento */}
-      <div className="border-t border-border/60 px-4 py-3">
-        <div className="space-y-1 text-sm">
-          <div className="flex justify-between text-muted-foreground">
-            <span>Subtotal:</span>
-            <span className="tabular-nums">{moeda(subtotal)}</span>
-          </div>
-          <div className="flex items-center justify-between gap-2 text-muted-foreground">
-            <label className="flex items-center gap-1.5">
-              <Tag className="h-3.5 w-3.5" />
-              Desconto:
-            </label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={desconto || ""}
-              placeholder="0,00"
-              onChange={(e) => setDesconto(Math.max(0, Number(e.target.value) || 0))}
-              className="w-24 rounded-lg border border-input bg-card px-2 py-1 text-right text-sm tabular-nums text-foreground outline-none focus:border-primary"
-            />
-          </div>
-          <div className="flex items-center justify-between border-t border-border/60 pt-1.5">
-            <span className="text-sm font-semibold text-foreground">Total</span>
-            <span className="text-xl font-extrabold tabular-nums tracking-tight text-foreground">
-              {moeda(total)}
-            </span>
-          </div>
-        </div>
-
-        <p className="mt-3 mb-1.5 text-xs font-medium text-muted-foreground">Forma de Pagamento</p>
-        <div className="grid grid-cols-4 gap-2">
-          {FORMAS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setForma(f.id)}
-              className={`flex flex-col items-center gap-1 rounded-xl border px-1 py-2 text-[11px] font-semibold transition-all ${
-                forma === f.id
-                  ? "border-primary bg-primary/10 text-brand-dark"
-                  : "border-border bg-card text-muted-foreground"
-              }`}
-            >
-              <span
-                className={`flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br ${f.cor}`}
-              >
-                <f.icone className="h-3.5 w-3.5 text-card" strokeWidth={2.25} />
-              </span>
-              {f.label}
-            </button>
+      <div className="space-y-3 border-t border-border p-4">
+        <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={inputCls}>
+          <option value="">Consumidor (sem cliente)</option>
+          {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </select>
+        <div className="grid grid-cols-3 gap-1.5">
+          {PAGAMENTOS.map((p) => (
+            <button key={p.id} onClick={() => setPag(p.id)} className={`rounded-lg border px-2 py-2 text-xs font-semibold ${pag === p.id ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground"}`}>{p.label}</button>
           ))}
         </div>
-
-        {forma === "cartao" && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Parcelas no cartão: <span className="font-semibold text-foreground">à vista</span> ·
-            Saldo a parcelar: <span className="font-semibold text-foreground">{moeda(total)}</span>
-          </p>
-        )}
-        {forma === "dinheiro" && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Valor recebido: <span className="font-semibold text-foreground">{moeda(total)}</span> ·
-            Troco: <span className="font-semibold text-foreground">{moeda(0)}</span>
-          </p>
-        )}
-        {forma === "fiado" && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Para vendas fiadas, selecione um cliente.
-          </p>
-        )}
-
-        <button
-          onClick={finalizar}
-          disabled={itens.length === 0}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-brand-dark shadow-[0_10px_28px_-6px] shadow-primary/60 transition-all hover:brightness-105 disabled:opacity-40 disabled:shadow-none"
-        >
-          FINALIZAR VENDA
-        </button>
+        <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>{brl(subtotal)}</span></div>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground">Desconto</span>
+          <input inputMode="decimal" value={desconto} onChange={(e) => setDesconto(e.target.value)} placeholder="0,00" className="w-24 rounded-lg border border-input bg-card px-2 py-1 text-right text-sm outline-none focus:border-primary" />
+        </div>
+        <div className="flex items-center justify-between text-lg font-bold"><span>Total</span><span>{brl(total)}</span></div>
+        <BtnPrimary onClick={finalizar} disabled={!carrinho.length || enviando} className="w-full py-3.5 text-base">{enviando ? "Salvando…" : "FINALIZAR VENDA"}</BtnPrimary>
       </div>
     </div>
   );
 
+  if (!isLoading && produtos.length === 0)
+    return (
+      <Vazio icon={<Package className="h-7 w-7" />} title="Cadastre produtos para vender" text="O PDV usa os produtos que você cadastrar. Comece pela tela de Produtos." action={<Link to="/produtos"><BtnPrimary>Ir para Produtos</BtnPrimary></Link>} />
+    );
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-      {/* Produtos */}
-      <section className="min-w-0 space-y-3 pb-36 lg:pb-0">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar produto ou kit..."
-              className="w-full rounded-xl border border-input bg-card py-2.5 pl-10 pr-4 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/20"
-            />
-          </div>
-          <button
-            aria-label="Escanear código de barras"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground transition-colors hover:bg-muted/70"
-          >
-            <ScanBarcode className="h-5 w-5" />
+    <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-5">
+      <div>
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar produto ou código…" className={`${inputCls} pl-10`} />
+        </div>
+        <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1">
+          <button onClick={() => setAtacado(!atacado)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold ${atacado ? "bg-brand-dark text-primary" : "border border-border text-muted-foreground"}`}>
+            {atacado ? "Preço de atacado" : "Preço de varejo"}
           </button>
-        </div>
-
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-          {CATS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCat(c)}
-              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                cat === c
-                  ? "bg-primary text-brand-dark"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {c}
-            </button>
+          {cats.map((c) => (
+            <button key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold ${cat === c ? "bg-primary text-brand-dark" : "bg-muted text-muted-foreground"}`}>{c}</button>
           ))}
         </div>
-
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
-          {filtrados.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => adicionar(p.id)}
-              className="group flex flex-col rounded-xl border border-border/60 bg-card p-3 text-left transition-all hover:border-primary/60 active:scale-[0.98]"
-            >
-              <div className="mb-2 flex h-20 items-center justify-center rounded-lg bg-gradient-to-br from-muted to-muted/50">
-                <Tag className="h-6 w-6 text-muted-foreground/50" />
-              </div>
-              <p className="line-clamp-2 min-h-[2.1rem] text-xs font-medium leading-tight text-foreground">
-                {p.nome}
-              </p>
-              <div className="mt-1.5 flex items-end justify-between">
-                <span className="text-sm font-bold tabular-nums text-foreground">
-                  {moeda(p.preco)}
-                </span>
-                <span className="text-[10px] text-muted-foreground">{p.estoque} un.</span>
-              </div>
+          {lista.map((p) => (
+            <button key={p.id} onClick={() => add(p)} className="rounded-2xl border border-border bg-card p-3 text-left transition-transform active:scale-95">
+              <p className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold text-foreground">{p.nome}</p>
+              <p className="mt-1 font-bold text-brand-dark">{brl(precoDe(p))}</p>
+              <p className={`text-[11px] ${Number(p.estoque) <= Number(p.estoque_minimo) ? "text-destructive" : "text-muted-foreground"}`}>Estoque: {Number(p.estoque).toLocaleString("pt-BR")} {p.unidade}</p>
             </button>
           ))}
-          {filtrados.length === 0 && (
-            <p className="col-span-full rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-              Nenhum produto encontrado para "{busca}".
-            </p>
-          )}
         </div>
-      </section>
+      </div>
 
-      {/* Painel lateral (desktop) */}
-      <aside className="sticky top-20 hidden h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border border-border/60 bg-card lg:flex lg:flex-col">
-        {painel}
+      <aside className="hidden lg:block">
+        <div className="sticky top-20 h-[calc(100vh-7rem)] rounded-2xl border border-border bg-card">{painel}</div>
       </aside>
 
-      {/* Carrinho em folha (mobile) */}
-      {carrinhoAberto && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background lg:hidden">
-          <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-            <span className="text-sm font-bold text-foreground">Carrinho</span>
-            <button
-              onClick={() => setCarrinhoAberto(false)}
-              aria-label="Fechar carrinho"
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="min-h-0 flex-1">{painel}</div>
-        </div>
+      {carrinho.length > 0 && !folha && (
+        <button onClick={() => setFolha(true)} className="fixed inset-x-4 bottom-20 z-30 flex items-center justify-between rounded-2xl bg-brand-dark px-5 py-3.5 text-primary shadow-lg lg:hidden">
+          <span className="text-sm font-semibold">Ver carrinho ({qtdItens})</span>
+          <span className="font-bold">{brl(total)}</span>
+        </button>
       )}
-
-      {/* Barra fixa mobile */}
-      <button
-        onClick={() => setCarrinhoAberto(true)}
-        className="fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between gap-3 rounded-2xl bg-primary px-4 py-3 text-brand-dark shadow-[0_12px_30px_-8px] shadow-primary/60 active:scale-[0.99] lg:hidden"
-      >
-        <span className="flex items-center gap-2 text-sm font-bold">
-          <ShoppingCart className="h-4.5 w-4.5" />
-          Ver carrinho
-          {qtdItens > 0 && (
-            <span className="rounded-full bg-brand-dark/15 px-2 text-xs">{qtdItens}</span>
-          )}
-        </span>
-        <span className="text-sm font-extrabold tabular-nums">{moeda(total)}</span>
-      </button>
+      {folha && <div className="fixed inset-0 z-50 bg-card lg:hidden">{painel}</div>}
     </div>
   );
 }
