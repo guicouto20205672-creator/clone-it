@@ -75,7 +75,7 @@ export function useCaixaAberto() {
           .order("aberto_em", { ascending: false })
           .limit(1)
           .maybeSingle(),
-      ),
+      ) as Caixa | null,
   });
 }
 

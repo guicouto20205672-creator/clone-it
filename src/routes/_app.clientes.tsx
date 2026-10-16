@@ -39,10 +39,10 @@ function Clientes() {
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.nome.trim()) return toast.error("Digite o nome do cliente");
+    if (!form.nome.trim()) { toast.error("Digite o nome do cliente"); return; }
     const dados = { nome: form.nome.trim(), telefone: form.telefone || null, documento: form.documento || null, endereco: form.endereco || null };
     const { error } = edit ? await supabase.from("clientes").update(dados).eq("id", edit.id) : await supabase.from("clientes").insert(dados);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(edit ? "Cliente atualizado" : "Cliente cadastrado");
     setAberto(false);
     refresh("clientes");
@@ -51,13 +51,13 @@ function Clientes() {
   async function excluir(c: Cliente) {
     if (!confirm(`Excluir "${c.nome}"?`)) return;
     const { error } = await supabase.from("clientes").delete().eq("id", c.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     refresh("clientes", "vendas");
   }
 
   async function receber(vendaId: string, total: number) {
     const { error } = await supabase.from("vendas").update({ status: "paga", pago_em: new Date().toISOString() }).eq("id", vendaId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     await supabase.from("lancamentos").insert({ tipo: "entrada", descricao: "Recebimento de fiado", valor: total, pago: true });
     toast.success("Pagamento recebido");
     refresh("vendas", "lancamentos");

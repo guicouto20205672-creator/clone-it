@@ -46,7 +46,7 @@ function Produtos() {
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.nome.trim()) return toast.error("Digite o nome do produto");
+    if (!form.nome.trim()) { toast.error("Digite o nome do produto"); return; }
     setSalvando(true);
     const dados = {
       nome: form.nome.trim(), codigo: form.codigo || null, categoria: form.categoria || null, unidade: form.unidade || "un",
@@ -58,7 +58,7 @@ function Produtos() {
       ? await supabase.from("produtos").update(dados).eq("id", edit.id)
       : await supabase.from("produtos").insert(dados);
     setSalvando(false);
-    if (error) return toast.error("Não foi possível salvar: " + error.message);
+    if (error) { toast.error("Não foi possível salvar: " + error.message); return; }
     toast.success(edit ? "Produto atualizado" : "Produto cadastrado");
     setAberto(false);
     refresh("produtos");
@@ -67,7 +67,7 @@ function Produtos() {
   async function excluir(p: Produto) {
     if (!confirm(`Excluir "${p.nome}"?`)) return;
     const { error } = await supabase.from("produtos").delete().eq("id", p.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Produto excluído");
     refresh("produtos");
   }

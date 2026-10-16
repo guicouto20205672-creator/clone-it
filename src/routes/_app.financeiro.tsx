@@ -36,9 +36,9 @@ function Financeiro() {
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.descricao.trim() || !num(form.valor)) return toast.error("Preencha descrição e valor");
+    if (!form.descricao.trim() || !num(form.valor)) { toast.error("Preencha descrição e valor"); return; }
     const { error } = await supabase.from("lancamentos").insert({ tipo: form.tipo, descricao: form.descricao.trim(), valor: num(form.valor), pago: form.pago, vencimento: form.vencimento || null });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Lançamento salvo");
     setAberto(false);
     setForm({ ...form, descricao: "", valor: "", vencimento: "" });
@@ -57,7 +57,7 @@ function Financeiro() {
 
   async function abrirCaixa() {
     const { error } = await supabase.from("caixas").insert({ valor_inicial: num(valorCaixa) });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Caixa aberto");
     setValorCaixa("");
     refresh("caixa");
@@ -66,7 +66,7 @@ function Financeiro() {
     if (!caixa) return;
     const final = Number(caixa.valor_inicial) + vendasCaixa;
     const { error } = await supabase.from("caixas").update({ fechado_em: new Date().toISOString(), valor_final: final }).eq("id", caixa.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(`Caixa fechado com ${brl(final)}`);
     refresh("caixa");
   }

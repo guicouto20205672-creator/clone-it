@@ -50,7 +50,7 @@ function PDV() {
 
   async function finalizar() {
     if (!carrinho.length) return;
-    if (pag === "fiado" && !clienteId) return toast.error("Escolha o cliente para vender fiado");
+    if (pag === "fiado" && !clienteId) { toast.error("Escolha o cliente para vender fiado"); return; }
     setEnviando(true);
     const custo = carrinho.reduce((s, i) => s + i.qtd * Number(i.produto.preco_custo), 0);
     const { data: venda, error } = await supabase
@@ -63,13 +63,13 @@ function PDV() {
       .single();
     if (error || !venda) {
       setEnviando(false);
-      return toast.error("Erro ao salvar venda: " + error?.message);
+      { toast.error("Erro ao salvar venda: " + error?.message); return; }
     }
     const { error: e2 } = await supabase.from("venda_itens").insert(
       carrinho.map((i) => ({ venda_id: venda.id, produto_id: i.produto.id, nome: i.produto.nome, quantidade: i.qtd, preco_unit: i.preco, custo_unit: Number(i.produto.preco_custo) })),
     );
     setEnviando(false);
-    if (e2) return toast.error("Erro nos itens: " + e2.message);
+    if (e2) { toast.error("Erro nos itens: " + e2.message); return; }
     toast.success(`Venda de ${brl(total)} finalizada!`, { icon: <CheckCircle2 className="h-4 w-4" /> });
     setCarrinho([]);
     setDesconto("");
