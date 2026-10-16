@@ -11,8 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppFinanceiroRouteImport } from './routes/_app.financeiro'
 import { Route as AppPdvRouteImport } from './routes/_app.pdv'
+import { Route as AppProdutosRouteImport } from './routes/_app.produtos'
+import { Route as AppVendasRouteImport } from './routes/_app.vendas'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -23,9 +27,19 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppClientesRoute = AppClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceiroRoute = AppFinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPdvRoute = AppPdvRouteImport.update({
@@ -33,30 +47,75 @@ const AppPdvRoute = AppPdvRouteImport.update({
   path: '/pdv',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProdutosRoute = AppProdutosRouteImport.update({
+  id: '/produtos',
+  path: '/produtos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppVendasRoute = AppVendasRouteImport.update({
+  id: '/vendas',
+  path: '/vendas',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/clientes': typeof AppClientesRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/pdv': typeof AppPdvRoute
+  '/produtos': typeof AppProdutosRoute
+  '/vendas': typeof AppVendasRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/clientes': typeof AppClientesRoute
   '/dashboard': typeof AppDashboardRoute
+  '/financeiro': typeof AppFinanceiroRoute
   '/pdv': typeof AppPdvRoute
+  '/produtos': typeof AppProdutosRoute
+  '/vendas': typeof AppVendasRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/_app/clientes': typeof AppClientesRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/financeiro': typeof AppFinanceiroRoute
   '/_app/pdv': typeof AppPdvRoute
+  '/_app/produtos': typeof AppProdutosRoute
+  '/_app/vendas': typeof AppVendasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/pdv'
+  fullPaths:
+    | '/'
+    | '/clientes'
+    | '/dashboard'
+    | '/financeiro'
+    | '/pdv'
+    | '/produtos'
+    | '/vendas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/pdv'
-  id: '__root__' | '/' | '/_app' | '/_app/dashboard' | '/_app/pdv'
+  to:
+    | '/'
+    | '/clientes'
+    | '/dashboard'
+    | '/financeiro'
+    | '/pdv'
+    | '/produtos'
+    | '/vendas'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/clientes'
+    | '/_app/dashboard'
+    | '/_app/financeiro'
+    | '/_app/pdv'
+    | '/_app/produtos'
+    | '/_app/vendas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -80,11 +139,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/clientes': {
+      id: '/_app/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof AppClientesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/financeiro': {
+      id: '/_app/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof AppFinanceiroRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/pdv': {
@@ -94,17 +167,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPdvRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/produtos': {
+      id: '/_app/produtos'
+      path: '/produtos'
+      fullPath: '/produtos'
+      preLoaderRoute: typeof AppProdutosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/vendas': {
+      id: '/_app/vendas'
+      path: '/vendas'
+      fullPath: '/vendas'
+      preLoaderRoute: typeof AppVendasRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppClientesRoute: typeof AppClientesRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppFinanceiroRoute: typeof AppFinanceiroRoute
   AppPdvRoute: typeof AppPdvRoute
+  AppProdutosRoute: typeof AppProdutosRoute
+  AppVendasRoute: typeof AppVendasRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppClientesRoute: AppClientesRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppFinanceiroRoute: AppFinanceiroRoute,
   AppPdvRoute: AppPdvRoute,
+  AppProdutosRoute: AppProdutosRoute,
+  AppVendasRoute: AppVendasRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
